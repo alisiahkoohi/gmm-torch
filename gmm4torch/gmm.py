@@ -70,18 +70,27 @@ class GaussianMixture(torch.nn.Module):
 
         self._init_params()
 
-    def _init_params(self):
+    def _init_params(self, device=None):
+        if not device:
+            device = torch.device("cpu")
         if self.mu_init is not None:
             assert self.mu_init.size() == (
                 1, self.n_components, self.n_features
             ), "Input mu_init does not have required tensor "
             "dimensions (1, %i, %i)" % (self.n_components, self.n_features)
             # (1, k, d)
-            self.mu = torch.nn.Parameter(self.mu_init, requires_grad=False)
+            self.mu = torch.nn.Parameter(
+                self.mu_init.to(device),
+                requires_grad=False,
+            )
         else:
-            self.mu = torch.nn.Parameter(torch.randn(1, self.n_components,
-                                                     self.n_features),
-                                         requires_grad=False)
+            self.mu = torch.nn.Parameter(
+                torch.randn(1,
+                            self.n_components,
+                            self.n_features,
+                            device=device),
+                requires_grad=False,
+            )
 
         if self.covariance_type == "diag":
             if self.var_init is not None:
@@ -90,12 +99,18 @@ class GaussianMixture(torch.nn.Module):
                     1, self.n_components, self.n_features
                 ), "Input var_init does not have required tensor "
                 "dimensions (1, %i, %i)" % (self.n_components, self.n_features)
-                self.var = torch.nn.Parameter(self.var_init,
-                                              requires_grad=False)
+                self.var = torch.nn.Parameter(
+                    self.var_init.to(device),
+                    requires_grad=False,
+                )
             else:
-                self.var = torch.nn.Parameter(torch.ones(
-                    1, self.n_components, self.n_features),
-                                              requires_grad=False)
+                self.var = torch.nn.Parameter(
+                    torch.ones(1,
+                               self.n_components,
+                               self.n_features,
+                               device=device),
+                    requires_grad=False,
+                )
         elif self.covariance_type == "full":
             if self.var_init is not None:
                 # (1, k, d, d)
@@ -104,19 +119,23 @@ class GaussianMixture(torch.nn.Module):
                 ), "Input var_init does not have required tensor "
                 "dimensions (1, %i, %i, %i)" % (
                     self.n_components, self.n_features, self.n_features)
-                self.var = torch.nn.Parameter(self.var_init,
-                                              requires_grad=False)
+                self.var = torch.nn.Parameter(
+                    self.var_init.to(device),
+                    requires_grad=False,
+                )
             else:
-                self.var = torch.nn.Parameter(torch.eye(
-                    self.n_features).reshape(1, 1, self.n_features,
-                                             self.n_features).repeat(
-                                                 1, self.n_components, 1, 1),
-                                              requires_grad=False)
+                self.var = torch.nn.Parameter(
+                    torch.eye(self.n_features, device=device).reshape(
+                        1, 1, self.n_features,
+                        self.n_features).repeat(1, self.n_components, 1, 1),
+                    requires_grad=False,
+                )
 
         # (1, k, 1)
-        self.pi = torch.nn.Parameter(torch.Tensor(1, self.n_components, 1),
-                                     requires_grad=False).fill_(
-                                         1. / self.n_components)
+        self.pi = torch.nn.Parameter(
+            torch.empty(1, self.n_components, 1, device=device),
+            requires_grad=False,
+        ).fill_(1. / self.n_components)
         self.params_fitted = False
 
     def check_size(self, x):
@@ -157,7 +176,7 @@ class GaussianMixture(torch.nn.Module):
             warm_start: bool
         """
         if not warm_start and self.params_fitted:
-            self._init_params()
+            self._init_params(device=x.device)
 
         x = self.check_size(x)
 
@@ -251,24 +270,27 @@ class GaussianMixture(torch.nn.Module):
             y:          torch.Tensor (n)
         """
         counts = torch.distributions.multinomial.Multinomial(
-            total_count=n, probs=self.pi.squeeze()).sample()
-        x = torch.empty(0, device=counts.device)
+            total_count=n, probs=self.pi.squeeze()).sample().cpu()
+        x = torch.empty(0, device=self.pi.device)
         y = torch.cat([
-            torch.full([int(sample)], j, device=counts.device)
+            torch.full([int(sample)], j, device=self.pi.device)
             for j, sample in enumerate(counts)
         ])
 
         # Only iterate over components with non-zero counts
+
         for k in np.arange(self.n_components)[counts > 0]:
             if self.covariance_type == "diag":
                 x_k = self.mu[0, k] + torch.randn(
                     int(counts[k]), self.n_features,
-                    device=x.device) * torch.sqrt(self.var[0, k])
+                    device=self.pi.device) * torch.sqrt(self.var[0, k])
             elif self.covariance_type == "full":
                 d_k = torch.distributions.multivariate_normal.MultivariateNormal(
                     self.mu[0, k], self.var[0, k])
-                x_k = torch.stack(
-                    [d_k.sample() for _ in range(int(counts[k]))])
+                x_k = torch.stack([
+                    d_k.sample().to(self.pi.device)
+                    for _ in range(int(counts[k]))
+                ])
 
             x = torch.cat((x, x_k), dim=0)
 
@@ -323,7 +345,6 @@ class GaussianMixture(torch.nn.Module):
         elif self.covariance_type == "diag":
             mu = self.mu
             prec = torch.rsqrt(self.var)
-
             log_p = torch.sum((mu * mu + x * x - 2 * x * mu) * (prec**2),
                               dim=2,
                               keepdim=True)
