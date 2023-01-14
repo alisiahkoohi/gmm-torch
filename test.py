@@ -25,10 +25,10 @@ class CpuCheck(unittest.TestCase):
         # check that dimensionality of class memberships is (n)
         self.assertEqual(torch.Tensor(x.size(0)).size(), y.size())
 
-
     def testPredictProbabilities(self):
         """
-        Assert that torch.FloatTensor is handled correctly when returning class probabilities.
+        Assert that torch.FloatTensor is handled correctly when returning class
+        probabilities.
         """
         x = torch.randn(400, 2)
         n_components = np.random.randint(1, 100)
@@ -38,12 +38,13 @@ class CpuCheck(unittest.TestCase):
 
         # check that y_p has dimensions (n, k)
         y_p = model.predict(x, probs=True)
-        self.assertEqual(torch.Tensor(x.size(0), n_components).size(), y_p.size())
-
+        self.assertEqual(
+            torch.Tensor(x.size(0), n_components).size(), y_p.size())
 
     def testEmMatchesDiagSkLearn(self):
         """
-        Assert that log-probabilities (E-step) and parameter updates (M-step) approximately match those of sklearn.
+        Assert that log-probabilities (E-step) and parameter updates (M-step)
+        approximately match those of sklearn.
         """
         d = 20
         n_components = np.random.randint(1, 100)
@@ -55,8 +56,12 @@ class CpuCheck(unittest.TestCase):
 
         var_init = torch.ones(1, n_components, d) - .4
 
-        model = GaussianMixture(n_components, d, var_init=var_init, covariance_type="diag")
-        model_sk = sklearn.mixture.GaussianMixture(n_components,
+        model = GaussianMixture(n_components,
+                                d,
+                                var_init=var_init,
+                                covariance_type="diag")
+        model_sk = sklearn.mixture.GaussianMixture(
+            n_components,
             covariance_type="diag",
             init_params="random",
             means_init=np.squeeze(model.mu.data.numpy()),
@@ -68,18 +73,18 @@ class CpuCheck(unittest.TestCase):
 
         # Test whether log-probabilities are approximately equal
         np.testing.assert_almost_equal(np.squeeze(log_prob.data.numpy()),
-            log_prob_sk,
-            decimal=2,
-            verbose=True)
+                                       log_prob_sk,
+                                       decimal=2,
+                                       verbose=True)
 
         _, log_resp_sk = model_sk._e_step(x_np)
         _, log_resp = model._e_step(x)
 
         # Test whether E-steps are approximately equal
         np.testing.assert_almost_equal(np.squeeze(log_resp.data.numpy()),
-            log_resp_sk,
-            decimal=0,
-            verbose=True)
+                                       log_resp_sk,
+                                       decimal=0,
+                                       verbose=True)
 
         model_sk._m_step(x_np, log_prob_sk)
         pi_sk = model_sk.weights_
@@ -90,25 +95,26 @@ class CpuCheck(unittest.TestCase):
 
         # Test whether pi ..
         np.testing.assert_almost_equal(np.squeeze(pi.data.numpy()),
-            pi_sk,
-            decimal=1,
-            verbose=True)
+                                       pi_sk,
+                                       decimal=1,
+                                       verbose=True)
 
         # .. mu ..
         np.testing.assert_almost_equal(np.squeeze(mu.data.numpy()),
-            mu_sk,
-            decimal=1,
-            verbose=True)
+                                       mu_sk,
+                                       decimal=1,
+                                       verbose=True)
 
         # .. and var are approximately equal
         np.testing.assert_almost_equal(np.squeeze(var.data.numpy()),
-            var_sk,
-            decimal=1,
-            verbose=True)
+                                       var_sk,
+                                       decimal=1,
+                                       verbose=True)
 
     def testEmMatchesFullSkLearn(self):
         """
-        Assert that log-probabilities (E-step) and parameter updates (M-step) approximately match those of sklearn.
+        Assert that log-probabilities (E-step) and parameter updates (M-step)
+        approximately match those of sklearn.
         """
         d = 20
         n_components = np.random.randint(1, 100)
@@ -118,10 +124,17 @@ class CpuCheck(unittest.TestCase):
         # (n, d)
         x_np = np.squeeze(x.data.numpy())
 
-        var_init = torch.eye(d,dtype=torch.float64).reshape(1, 1, d, d).repeat(1,n_components,1, 1)
+        var_init = torch.eye(d,
+                             dtype=torch.float64).reshape(1, 1, d, d).repeat(
+                                 1, n_components, 1, 1)
 
-        model = GaussianMixture(n_components, d, init_params="random", var_init=var_init, covariance_type="full")
-        model_sk = sklearn.mixture.GaussianMixture(n_components,
+        model = GaussianMixture(n_components,
+                                d,
+                                init_params="random",
+                                var_init=var_init,
+                                covariance_type="full")
+        model_sk = sklearn.mixture.GaussianMixture(
+            n_components,
             covariance_type="full",
             init_params="random",
             means_init=np.squeeze(model.mu.data.numpy()),
@@ -133,18 +146,18 @@ class CpuCheck(unittest.TestCase):
 
         # Test whether log-probabilities are approximately equal
         np.testing.assert_almost_equal(np.squeeze(log_prob.data.numpy()),
-            log_prob_sk,
-            decimal=2,
-            verbose=True)
+                                       log_prob_sk,
+                                       decimal=2,
+                                       verbose=True)
 
         _, log_resp_sk = model_sk._e_step(x_np)
         _, log_resp = model._e_step(x)
 
         # Test whether E-steps are approximately equal
         np.testing.assert_almost_equal(np.squeeze(log_resp.data.numpy()),
-            log_resp_sk,
-            decimal=0,
-            verbose=True)
+                                       log_resp_sk,
+                                       decimal=0,
+                                       verbose=True)
 
         model_sk._m_step(x_np, log_resp_sk)
         pi_sk = model_sk.weights_
@@ -155,21 +168,21 @@ class CpuCheck(unittest.TestCase):
 
         # Test whether pi ..
         np.testing.assert_almost_equal(np.squeeze(pi.data.numpy()),
-            pi_sk,
-            decimal=1,
-            verbose=True)
+                                       pi_sk,
+                                       decimal=1,
+                                       verbose=True)
 
         # .. mu ..
         np.testing.assert_almost_equal(np.squeeze(mu.data.numpy()),
-            mu_sk,
-            decimal=1,
-            verbose=True)
+                                       mu_sk,
+                                       decimal=1,
+                                       verbose=True)
 
         # .. and var are approximately equal
         np.testing.assert_almost_equal(np.squeeze(var.data.numpy()),
-            var_sk,
-            decimal=1,
-            verbose=True)
+                                       var_sk,
+                                       decimal=1,
+                                       verbose=True)
 
 
 class GpuCheck(unittest.TestCase):
@@ -183,27 +196,32 @@ class GpuCheck(unittest.TestCase):
         x = torch.randn(400, 2).cuda()
         n_components = np.random.randint(1, 100)
 
-        model = GaussianMixture(n_components, x.size(1), covariance_type="diag").cuda()
+        model = GaussianMixture(n_components,
+                                x.size(1),
+                                covariance_type="diag").cuda()
         model.fit(x)
         y = model.predict(x)
 
         # check that dimensionality of class memberships is (n)
         self.assertEqual(torch.Tensor(x.size(0)).size(), y.size())
 
-
     def testPredictProbabilities(self):
         """
-        Assert that torch.cuda.FloatTensor is handled correctly when returning class probabilities.
+        Assert that torch.cuda.FloatTensor is handled correctly when returning
+        class probabilities.
         """
         x = torch.randn(400, 2).cuda()
         n_components = np.random.randint(1, 100)
 
-        model = GaussianMixture(n_components, x.size(1), covariance_type="diag").cuda()
+        model = GaussianMixture(n_components,
+                                x.size(1),
+                                covariance_type="diag").cuda()
         model.fit(x)
 
         # check that y_p has dimensions (n, k)
         y_p = model.predict(x, probs=True)
-        self.assertEqual(torch.Tensor(x.size(0), n_components).size(), y_p.size())
+        self.assertEqual(
+            torch.Tensor(x.size(0), n_components).size(), y_p.size())
 
 
 if __name__ == "__main__":
